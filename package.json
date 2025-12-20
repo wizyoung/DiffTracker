@@ -1,0 +1,108 @@
+{
+  "name": "diff-tracker",
+  "displayName": "Diff Tracker",
+  "description": "Visual file diff tracking - record and display changes in real-time",
+  "version": "0.1.0",
+  "publisher": "difftracker",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "diffTracker",
+          "title": "Diff Tracker",
+          "icon": "resources/record-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "diffTracker": [
+        {
+          "id": "diffTrackerView",
+          "name": "Change Recording"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "diffTracker.toggleRecording",
+        "title": "Toggle Recording",
+        "category": "Diff Tracker",
+        "icon": "$(record)"
+      },
+      {
+        "command": "diffTracker.startRecording",
+        "title": "Start Recording",
+        "category": "Diff Tracker"
+      },
+      {
+        "command": "diffTracker.stopRecording",
+        "title": "Stop Recording",
+        "category": "Diff Tracker"
+      },
+      {
+        "command": "diffTracker.showDiffs",
+        "title": "Show Diffs",
+        "category": "Diff Tracker"
+      },
+      {
+        "command": "diffTracker.clearDiffs",
+        "title": "Clear Diffs",
+        "category": "Diff Tracker"
+      },
+      {
+        "command": "diffTracker.revertAllChanges",
+        "title": "Revert All Changes",
+        "category": "Diff Tracker",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "diffTracker.showInlineDiff",
+        "title": "Show Inline Diff",
+        "category": "Diff Tracker"
+      },
+      {
+        "command": "diffTracker.showSideBySideDiff",
+        "title": "Show Side-by-Side Diff",
+        "category": "Diff Tracker",
+        "icon": "$(split-horizontal)"
+      }
+    ],
+    "menus": {
+      "view/item/context": [
+        {
+          "command": "diffTracker.showSideBySideDiff",
+          "when": "viewItem == changedFile",
+          "group": "inline"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "lint": "eslint src --ext ts",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/diff": "^7.0.2",
+    "@types/node": "^20.x",
+    "@types/vscode": "^1.80.0",
+    "@typescript-eslint/eslint-plugin": "^6.x",
+    "@typescript-eslint/parser": "^6.x",
+    "@vscode/vsce": "^2.22.0",
+    "eslint": "^8.x",
+    "typescript": "^5.2.0"
+  },
+  "dependencies": {
+    "diff": "^5.1.0"
+  }
+}
