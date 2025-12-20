@@ -207,7 +207,17 @@ export class DecorationManager {
     }
 
     private updateInlineDecorations(editor: vscode.TextEditor) {
-        const filePath = editor.document.uri.fsPath;
+        // Extract original file path (remove (Diff) prefix if present)
+        let filePath = editor.document.uri.fsPath;
+        const lastSlash = filePath.lastIndexOf('/');
+        if (lastSlash !== -1) {
+            const dir = filePath.substring(0, lastSlash);
+            const fileName = filePath.substring(lastSlash + 1);
+            if (fileName.startsWith('(Diff) ')) {
+                filePath = dir + '/' + fileName.substring(7);
+            }
+        }
+
         const lineTypes = this.diffTracker.getInlineLineTypes(filePath);
 
         if (!lineTypes) {

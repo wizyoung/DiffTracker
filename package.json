@@ -2,7 +2,7 @@
   "name": "diff-tracker",
   "displayName": "Diff Tracker",
   "description": "Visual file diff tracking - record and display changes in real-time",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "Wizyoung",
   "author": "Wizyoung",
   "icon": "resources/marketplace-icon.png",
@@ -109,10 +109,36 @@
           "dark": "resources/diff-inline-dark.svg",
           "light": "resources/diff-inline-light.svg"
         }
+      },
+      {
+        "command": "diffTracker.revertBlock",
+        "title": "Revert Block",
+        "category": "Diff Tracker"
+      },
+      {
+        "command": "diffTracker.keepBlock",
+        "title": "Keep Block",
+        "category": "Diff Tracker"
+      },
+      {
+        "command": "diffTracker.goToBlock",
+        "title": "Go to Block",
+        "category": "Diff Tracker"
+      },
+      {
+        "command": "diffTracker.openOriginalFile",
+        "title": "Open Original File",
+        "category": "Diff Tracker",
+        "icon": "$(go-to-file)"
       }
     ],
     "menus": {
       "view/item/context": [
+        {
+          "command": "diffTracker.openOriginalFile",
+          "when": "viewItem == changedFile",
+          "group": "inline"
+        },
         {
           "command": "diffTracker.showSideBySideDiff",
           "when": "viewItem == changedFile",

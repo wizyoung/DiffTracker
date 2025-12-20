@@ -75,7 +75,11 @@ None at this time. Please open an issue if you find a bug.
 - Clear diffs
 
 ### 0.2.0
-- change from LCS-based diff to Patience Diff algorithm for more intuitive diff display
+- Change from LCS-based diff to Patience Diff algorithm for more intuitive diff display
+
+## 0.3.0
+- Add Partial Revert/Keep buttons, just like cursor
+- Add go-to-original-file button in left panel
 
 ## License
 

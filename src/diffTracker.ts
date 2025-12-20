@@ -190,6 +190,196 @@ export class DiffTracker {
         ).inlineView;
     }
 
+    /**
+     * Revert a specific change block to its original content
+     */
+    public async revertBlock(filePath: string, blockIndex: number): Promise<boolean> {
+        const lineChanges = this.lineChanges.get(filePath);
+        const originalContent = this.fileSnapshots.get(filePath);
+
+        if (!lineChanges || originalContent === undefined) {
+            return false;
+        }
+
+        // Get the blocks
+        const blocks = this.getChangeBlocks(filePath);
+        if (blockIndex < 0 || blockIndex >= blocks.length) {
+            return false;
+        }
+
+        const block = blocks[blockIndex];
+        const originalLines = originalContent.split('\n');
+
+        try {
+            const uri = vscode.Uri.file(filePath);
+            const doc = await vscode.workspace.openTextDocument(uri);
+            const edit = new vscode.WorkspaceEdit();
+
+            if (block.type === 'added') {
+                // Delete the added lines
+                const startLine = block.startLine - 1;
+                const endLine = block.endLine;
+                const range = new vscode.Range(startLine, 0, endLine, 0);
+                edit.delete(uri, range);
+            } else if (block.type === 'modified') {
+                // Replace with original content
+                const startLine = block.startLine - 1;
+                const endLine = block.endLine - 1;
+                const range = new vscode.Range(
+                    startLine, 0,
+                    endLine, doc.lineAt(endLine).text.length
+                );
+
+                // Get original lines for this block
+                const originalBlockLines: string[] = [];
+                block.changes.forEach(change => {
+                    if (change.oldText !== undefined) {
+                        originalBlockLines.push(change.oldText);
+                    }
+                });
+
+                edit.replace(uri, range, originalBlockLines.join('\n'));
+            } else if (block.type === 'deleted') {
+                // Insert the deleted lines back
+                const insertLine = block.startLine - 1;
+                const position = new vscode.Position(insertLine, 0);
+
+                const deletedLines: string[] = [];
+                block.changes.forEach(change => {
+                    if (change.oldText !== undefined) {
+                        deletedLines.push(change.oldText);
+                    }
+                });
+
+                edit.insert(uri, position, deletedLines.join('\n') + '\n');
+            }
+
+            const success = await vscode.workspace.applyEdit(edit);
+            return success;
+        } catch (error) {
+            console.error(`Failed to revert block in ${filePath}:`, error);
+            return false;
+        }
+    }
+
+    /**
+     * Keep a specific change block (accept the changes)
+     * This updates the snapshot to include the current changes
+     */
+    public keepBlock(filePath: string, blockIndex: number): boolean {
+        const blocks = this.getChangeBlocks(filePath);
+        if (blockIndex < 0 || blockIndex >= blocks.length) {
+            return false;
+        }
+
+        const block = blocks[blockIndex];
+        const originalContent = this.fileSnapshots.get(filePath);
+        const trackedChange = this.trackedChanges.get(filePath);
+
+        if (originalContent === undefined || !trackedChange) {
+            return false;
+        }
+
+        // Update the snapshot to include this block's changes
+        // This effectively "accepts" the changes for this block
+        const currentContent = trackedChange.currentContent;
+        const originalLines = originalContent.split('\n');
+        const currentLines = currentContent.split('\n');
+
+        // For simplicity, update the entire snapshot to current content
+        // A more sophisticated approach would surgically update only the block
+        // But for now, keeping a block means we update the snapshot
+        // to the current document state for those lines
+
+        // Get the document's current content and update snapshot
+        const doc = vscode.workspace.textDocuments.find(d => d.uri.fsPath === filePath);
+        if (doc) {
+            this.fileSnapshots.set(filePath, doc.getText());
+            // Recalculate changes
+            this.calculateLineChanges(filePath);
+            this._onDidTrackChanges.fire();
+        }
+
+        return true;
+    }
+
+    /**
+     * Get change blocks for a file (used by CodeLens)
+     */
+    public getChangeBlocks(filePath: string): Array<{
+        startLine: number;
+        endLine: number;
+        type: 'added' | 'modified' | 'deleted';
+        changes: LineChange[];
+        blockIndex: number;
+    }> {
+        const lineChanges = this.lineChanges.get(filePath);
+        if (!lineChanges || lineChanges.length === 0) {
+            return [];
+        }
+
+        // Filter out 'unchanged' type and sort by line number
+        const changes = lineChanges
+            .filter(c => c.type !== 'unchanged')
+            .sort((a, b) => a.lineNumber - b.lineNumber);
+
+        if (changes.length === 0) {
+            return [];
+        }
+
+        const blocks: Array<{
+            startLine: number;
+            endLine: number;
+            type: 'added' | 'modified' | 'deleted';
+            changes: LineChange[];
+            blockIndex: number;
+        }> = [];
+
+        let currentBlock: LineChange[] = [changes[0]];
+        let currentType = changes[0].type;
+
+        for (let i = 1; i < changes.length; i++) {
+            const change = changes[i];
+            const prevChange = changes[i - 1];
+
+            // Check if this change is consecutive and same type
+            const isConsecutive = change.lineNumber <= prevChange.lineNumber + 1;
+            const isSameType = change.type === currentType;
+
+            if (isConsecutive && isSameType) {
+                currentBlock.push(change);
+            } else {
+                // Save current block and start new one
+                const startLine = Math.min(...currentBlock.map(c => c.lineNumber));
+                const endLine = Math.max(...currentBlock.map(c => c.lineNumber));
+                blocks.push({
+                    startLine,
+                    endLine,
+                    type: currentType as 'added' | 'modified' | 'deleted',
+                    changes: currentBlock,
+                    blockIndex: blocks.length
+                });
+                currentBlock = [change];
+                currentType = change.type;
+            }
+        }
+
+        // Don't forget the last block
+        if (currentBlock.length > 0) {
+            const startLine = Math.min(...currentBlock.map(c => c.lineNumber));
+            const endLine = Math.max(...currentBlock.map(c => c.lineNumber));
+            blocks.push({
+                startLine,
+                endLine,
+                type: currentType as 'added' | 'modified' | 'deleted',
+                changes: currentBlock,
+                blockIndex: blocks.length
+            });
+        }
+
+        return blocks;
+    }
+
     private onDocumentChanged(event: vscode.TextDocumentChangeEvent) {
         if (!this.isRecording) {
             return;

@@ -6,12 +6,14 @@ import { DiffHoverProvider } from './hoverProvider';
 import { StatusBarManager } from './statusBarManager';
 import { OriginalContentProvider } from './originalContentProvider';
 import { InlineContentProvider } from './inlineContentProvider';
+import { DiffCodeLensProvider } from './codeLensProvider';
 
 let diffTracker: DiffTracker;
 let decorationManager: DecorationManager;
 let statusBarManager: StatusBarManager;
 let originalContentProvider: OriginalContentProvider;
 let inlineContentProvider: InlineContentProvider;
+let codeLensProvider: DiffCodeLensProvider;
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('Diff Tracker extension is now active');
@@ -22,6 +24,7 @@ export function activate(context: vscode.ExtensionContext) {
     statusBarManager = new StatusBarManager(diffTracker);
     originalContentProvider = new OriginalContentProvider(diffTracker);
     inlineContentProvider = new InlineContentProvider(diffTracker);
+    codeLensProvider = new DiffCodeLensProvider(diffTracker);
 
     // Register tree view provider for activity bar
     const treeDataProvider = new DiffTreeDataProvider(diffTracker);
@@ -32,6 +35,11 @@ export function activate(context: vscode.ExtensionContext) {
     // Register hover provider to show diff details
     context.subscriptions.push(
         vscode.languages.registerHoverProvider('*', new DiffHoverProvider(diffTracker))
+    );
+
+    // Register CodeLens provider for block-wise actions
+    context.subscriptions.push(
+        vscode.languages.registerCodeLensProvider('*', codeLensProvider)
     );
 
     // Register virtual document provider for original content
@@ -97,7 +105,11 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
-            const inlineUri = vscode.Uri.file(filePath).with({ scheme: 'diff-tracker-inline' });
+            // Create URI with (Diff) prefix in filename for clear tab identification
+            const fileName = filePath.split('/').pop() || 'file';
+            const dirPath = filePath.substring(0, filePath.length - fileName.length);
+            const diffPath = `${dirPath}(Diff) ${fileName}`;
+            const inlineUri = vscode.Uri.file(diffPath).with({ scheme: 'diff-tracker-inline' });
             const doc = await vscode.workspace.openTextDocument(inlineUri);
             const editor = await vscode.window.showTextDocument(doc);
             decorationManager.updateDecorations(editor);
@@ -204,12 +216,68 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
+    // Open the original file (not the diff view)
+    context.subscriptions.push(
+        vscode.commands.registerCommand('diffTracker.openOriginalFile', async (filePathOrItem: string | any) => {
+            const filePath = typeof filePathOrItem === 'string'
+                ? filePathOrItem
+                : filePathOrItem?.filePath;
+
+            if (!filePath) {
+                return;
+            }
+
+            const uri = vscode.Uri.file(filePath);
+            const doc = await vscode.workspace.openTextDocument(uri);
+            await vscode.window.showTextDocument(doc);
+        })
+    );
+
     context.subscriptions.push(
         vscode.commands.registerCommand('diffTracker.clearDiffs', () => {
             diffTracker.clearDiffs();
             treeDataProvider.refresh();
             decorationManager.clearAllDecorations();
             vscode.window.showInformationMessage('Diff Tracker: All diffs cleared');
+        })
+    );
+
+    // Block-wise revert command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('diffTracker.revertBlock', async (filePath: string, blockIndex: number) => {
+            const success = await diffTracker.revertBlock(filePath, blockIndex);
+            if (success) {
+                codeLensProvider.refresh();
+                treeDataProvider.refresh();
+            }
+        })
+    );
+
+    // Block-wise keep command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('diffTracker.keepBlock', (filePath: string, blockIndex: number) => {
+            const success = diffTracker.keepBlock(filePath, blockIndex);
+            if (success) {
+                codeLensProvider.refresh();
+                treeDataProvider.refresh();
+            }
+        })
+    );
+
+    // Navigate to block
+    context.subscriptions.push(
+        vscode.commands.registerCommand('diffTracker.goToBlock', async (filePath: string, blockIndex: number) => {
+            const blocks = diffTracker.getChangeBlocks(filePath);
+            if (blockIndex >= 0 && blockIndex < blocks.length) {
+                const block = blocks[blockIndex];
+                const uri = vscode.Uri.file(filePath);
+                const doc = await vscode.workspace.openTextDocument(uri);
+                const editor = await vscode.window.showTextDocument(doc);
+                const line = Math.max(0, block.startLine - 1);
+                const position = new vscode.Position(line, 0);
+                editor.selection = new vscode.Selection(position, position);
+                editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
+            }
         })
     );
 
@@ -271,5 +339,8 @@ export function deactivate() {
     }
     if (inlineContentProvider) {
         inlineContentProvider.dispose();
+    }
+    if (codeLensProvider) {
+        codeLensProvider.dispose();
     }
 }
