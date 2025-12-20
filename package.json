@@ -2,7 +2,7 @@
   "name": "diff-tracker",
   "displayName": "Diff Tracker",
   "description": "Visual file diff tracking - record and display changes in real-time",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "publisher": "Wizyoung",
   "author": "Wizyoung",
   "icon": "resources/marketplace-icon.png",

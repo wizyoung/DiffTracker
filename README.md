@@ -81,6 +81,15 @@ None at this time. Please open an issue if you find a bug.
 - Add Partial Revert/Keep buttons, just like cursor
 - Add go-to-original-file button in left panel
 
+## 0.3.1
+- Add file-level "Revert All" / "Keep All" buttons (CodeLens at file top)
+- Add settings panel in sidebar to toggle display options
+- Fix block-wise keep/revert affecting all blocks instead of just one
+- Fix hover showing "unknown" for deleted empty lines
+
+# 0.3.2
+- tiny bug fix
+
 ## License
 
 MIT
