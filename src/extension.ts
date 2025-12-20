@@ -5,11 +5,13 @@ import { DiffTreeDataProvider } from './diffTreeView';
 import { DiffHoverProvider } from './hoverProvider';
 import { StatusBarManager } from './statusBarManager';
 import { OriginalContentProvider } from './originalContentProvider';
+import { InlineContentProvider } from './inlineContentProvider';
 
 let diffTracker: DiffTracker;
 let decorationManager: DecorationManager;
 let statusBarManager: StatusBarManager;
 let originalContentProvider: OriginalContentProvider;
+let inlineContentProvider: InlineContentProvider;
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('Diff Tracker extension is now active');
@@ -19,10 +21,13 @@ export function activate(context: vscode.ExtensionContext) {
     decorationManager = new DecorationManager(diffTracker);
     statusBarManager = new StatusBarManager(diffTracker);
     originalContentProvider = new OriginalContentProvider(diffTracker);
+    inlineContentProvider = new InlineContentProvider(diffTracker);
 
     // Register tree view provider for activity bar
     const treeDataProvider = new DiffTreeDataProvider(diffTracker);
-    vscode.window.registerTreeDataProvider('diffTrackerView', treeDataProvider);
+    context.subscriptions.push(
+        vscode.window.registerTreeDataProvider('diffTracker.changesView', treeDataProvider)
+    );
 
     // Register hover provider to show diff details
     context.subscriptions.push(
@@ -34,15 +39,21 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.workspace.registerTextDocumentContentProvider('diff-tracker-original', originalContentProvider)
     );
 
+    context.subscriptions.push(
+        vscode.workspace.registerTextDocumentContentProvider('diff-tracker-inline', inlineContentProvider)
+    );
+
     // Register commands
     context.subscriptions.push(
         vscode.commands.registerCommand('diffTracker.toggleRecording', () => {
             if (diffTracker.getIsRecording()) {
                 diffTracker.stopRecording();
+                vscode.commands.executeCommand('setContext', 'diffTracker.isRecording', false);
                 treeDataProvider.refresh();
                 decorationManager.clearAllDecorations();
             } else {
                 diffTracker.startRecording();
+                vscode.commands.executeCommand('setContext', 'diffTracker.isRecording', true);
                 treeDataProvider.refresh();
 
                 // Update decorations for current editor
@@ -56,6 +67,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('diffTracker.startRecording', () => {
             diffTracker.startRecording();
+            vscode.commands.executeCommand('setContext', 'diffTracker.isRecording', true);
             treeDataProvider.refresh();
 
             // Update decorations for current editor
@@ -68,6 +80,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('diffTracker.stopRecording', () => {
             diffTracker.stopRecording();
+            vscode.commands.executeCommand('setContext', 'diffTracker.isRecording', false);
             treeDataProvider.refresh();
             decorationManager.clearAllDecorations();
         })
@@ -84,9 +97,8 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
-            // Open file and show inline diff decorations
-            const uri = vscode.Uri.file(filePath);
-            const doc = await vscode.workspace.openTextDocument(uri);
+            const inlineUri = vscode.Uri.file(filePath).with({ scheme: 'diff-tracker-inline' });
+            const doc = await vscode.workspace.openTextDocument(inlineUri);
             const editor = await vscode.window.showTextDocument(doc);
             decorationManager.updateDecorations(editor);
         })
@@ -105,7 +117,7 @@ export function activate(context: vscode.ExtensionContext) {
 
             // Show side-by-side diff using VS Code's built-in diff editor
             const currentUri = vscode.Uri.file(filePath);
-            const originalUri = vscode.Uri.parse(`diff-tracker-original://${filePath}`);
+            const originalUri = currentUri.with({ scheme: 'diff-tracker-original' });
 
             const fileName = filePath.split('/').pop() || filePath.split('\\').pop() || 'file';
 
@@ -114,6 +126,17 @@ export function activate(context: vscode.ExtensionContext) {
                 currentUri,
                 `Original  ↔  Current: ${fileName}`
             );
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('diffTracker.showSideBySideDiffActive', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor || editor.document.uri.scheme !== 'file') {
+                return;
+            }
+
+            await vscode.commands.executeCommand('diffTracker.showSideBySideDiff', editor.document.uri.fsPath);
         })
     );
 
@@ -152,11 +175,52 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     context.subscriptions.push(
+        vscode.commands.registerCommand('diffTracker.revertFile', async (filePathOrItem: string | any) => {
+            const filePath = typeof filePathOrItem === 'string'
+                ? filePathOrItem
+                : filePathOrItem?.filePath;
+
+            if (!filePath) {
+                return;
+            }
+
+            const answer = await vscode.window.showWarningMessage(
+                `Revert changes for ${filePath}? This cannot be undone.`,
+                { modal: true },
+                'Revert',
+                'Cancel'
+            );
+
+            if (answer !== 'Revert') {
+                return;
+            }
+
+            const success = await diffTracker.revertFile(filePath);
+            if (success) {
+                treeDataProvider.refresh();
+                decorationManager.clearAllDecorations();
+                vscode.window.showInformationMessage('File reverted to original content');
+            }
+        })
+    );
+
+    context.subscriptions.push(
         vscode.commands.registerCommand('diffTracker.clearDiffs', () => {
             diffTracker.clearDiffs();
             treeDataProvider.refresh();
             decorationManager.clearAllDecorations();
             vscode.window.showInformationMessage('Diff Tracker: All diffs cleared');
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('diffTracker.showInlineDiffActive', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor || editor.document.uri.scheme !== 'file') {
+                return;
+            }
+
+            await vscode.commands.executeCommand('diffTracker.showInlineDiff', editor.document.uri.fsPath);
         })
     );
 
@@ -169,20 +233,22 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
+    const updateVisibleDecorations = () => {
+        vscode.window.visibleTextEditors.forEach(editor => {
+            decorationManager.updateDecorations(editor);
+        });
+    };
+
     // Update decorations when recording state changes
     diffTracker.onDidChangeRecordingState(() => {
         treeDataProvider.refresh();
-        if (vscode.window.activeTextEditor) {
-            decorationManager.updateDecorations(vscode.window.activeTextEditor);
-        }
+        updateVisibleDecorations();
     });
 
     // Update decorations when changes are tracked
     diffTracker.onDidTrackChanges(() => {
         treeDataProvider.refresh();
-        if (vscode.window.activeTextEditor) {
-            decorationManager.updateDecorations(vscode.window.activeTextEditor);
-        }
+        updateVisibleDecorations();
     });
 
     // Register disposables
@@ -202,5 +268,8 @@ export function deactivate() {
     }
     if (originalContentProvider) {
         originalContentProvider.dispose();
+    }
+    if (inlineContentProvider) {
+        inlineContentProvider.dispose();
     }
 }

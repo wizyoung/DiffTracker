@@ -1,52 +1,54 @@
 # Diff Tracker
 
-A powerful VS Code extension that visually tracks file changes in real-time with an intuitive diff display.
+Diff Tracker is a VS Code extension that records file changes and shows a Git-like inline diff directly in the editor.
 
 ## Features
 
-- **📍 Activity Bar Integration**: Convenient sidebar icon for easy access
-- **🎥 Recording Mode**: Start/stop tracking file changes with a single click
-- **🎨 Visual Diff Display**: Beautiful, color-coded diff view showing additions (green) and deletions (red)
-- **📄 Multi-file Support**: Track changes across multiple files simultaneously
-- **⏱️ Timestamp Tracking**: See when each change was made
-- **🔍 Line-by-line Comparison**: Detailed view with line numbers for both original and modified content
+- Activity Bar view for tracked changes
+- Recording mode to start and stop tracking
+- Inline diff with added/removed highlights
+- Side-by-side diff on demand
+- Hover details for deleted/modified content
+- Multi-file tracking with timestamps
+- Revert per file or revert all
+- Clear all tracked diffs
+- Editor title buttons for inline and side-by-side diff
 
 ## Usage
 
-1. **Open the Diff Tracker** by clicking the recording icon in the activity bar (leftmost sidebar)
-
-2. **Start Recording** by clicking the "Start Recording" button in the sidebar
-
-3. **Edit Files** - make changes to any files in your workspace
-
-4. **View Diffs** - click "View Diffs" to see all tracked changes in a visual diff panel
-
-5. **Stop Recording** when you're done to prevent tracking new changes
-
-6. **Clear Diffs** to remove all tracked changes from the view
+1. Open the Diff Tracker view from the Activity Bar.
+2. Click Start Recording.
+3. Edit any file in your workspace.
+4. Click a file in the left list to open the inline diff.
+5. Use the editor title buttons to open:
+   - Inline Diff (single-column)
+   - Side-by-Side Diff
+6. Use Revert File or Revert All as needed.
+7. Click Clear Diffs to remove all tracked changes.
+8. Click Stop Recording when you are done.
 
 ## How It Works
 
-When you start recording, Diff Tracker:
-1. Captures a snapshot of all currently open files
-2. Monitors file changes in real-time
-3. Generates visual diffs comparing original vs. modified content
-4. Displays changes with syntax highlighting and line numbers
+When recording starts, Diff Tracker:
+1. Captures a baseline snapshot for files
+2. Watches for content changes
+3. Builds inline and side-by-side diffs
+4. Updates the editor and the changes view in real time
 
 ## Installation
 
 ### From VSIX
-1. Download the `.vsix` file
+1. Download the .vsix file
 2. Open VS Code
-3. Go to Extensions view (Cmd+Shift+X)
-4. Click the "..." menu → "Install from VSIX..."
-5. Select the downloaded `.vsix` file
+3. Open Extensions (Cmd+Shift+X)
+4. Click ... -> Install from VSIX...
+5. Select the downloaded .vsix
 
 ### Development
-1. Clone this repository
-2. Run `npm install`
-3. Run `npm run compile`
-4. Press F5 to launch Extension Development Host
+1. Clone the repository
+2. Run npm install
+3. Run npm run compile
+4. Press F5 to launch the Extension Development Host
 
 ## Requirements
 
@@ -54,22 +56,23 @@ When you start recording, Diff Tracker:
 
 ## Extension Settings
 
-This extension does not add any VS Code settings.
+This extension does not add any settings.
 
 ## Known Issues
 
-None at this time. Please report issues on the GitHub repository.
+None at this time. Please open an issue if you find a bug.
 
 ## Release Notes
 
 ### 0.1.0
 
-Initial release:
-- Activity bar integration
+- Activity Bar entry
 - Recording mode for change tracking
-- Visual diff display with red/green highlighting
-- Multi-file support
-- Clear and stop recording functionality
+- Inline diff highlighting
+- Side-by-side diff
+- Multi-file tracking with timestamps
+- Revert file and revert all
+- Clear diffs
 
 ## License
 

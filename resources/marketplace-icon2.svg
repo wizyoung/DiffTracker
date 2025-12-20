@@ -1,0 +1,90 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Background Container Gradient -->
+    <linearGradient id="icon-bg" x1="64" y1="0" x2="64" y2="128" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#374151"/> <!-- Slate 700 -->
+      <stop offset="1" stop-color="#111827"/> <!-- Slate 900 -->
+    </linearGradient>
+
+    <!-- Page Surface Gradient -->
+    <linearGradient id="page-surface" x1="0" y1="0" x2="0" y2="1">
+       <stop offset="0" stop-color="#1F2937"/>
+       <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+
+     <!-- Diff Insert (Green) -->
+    <linearGradient id="diff-green-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="rgba(16, 185, 129, 0.2)"/>
+      <stop offset="1" stop-color="rgba(5, 150, 105, 0.2)"/>
+    </linearGradient>
+    <linearGradient id="diff-green-line" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#34D399"/>
+      <stop offset="1" stop-color="#10B981"/>
+    </linearGradient>
+
+    <!-- Diff Delete (Red) -->
+    <linearGradient id="diff-red-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="rgba(239, 68, 68, 0.2)"/>
+      <stop offset="1" stop-color="rgba(185, 28, 28, 0.2)"/>
+    </linearGradient>
+     <linearGradient id="diff-red-line" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#F87171"/>
+      <stop offset="1" stop-color="#EF4444"/>
+    </linearGradient>
+    
+    <!-- Shadow for the Page -->
+    <filter id="page-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <!-- Outer Icon Shape (Squircle - deeply rounded) -->
+  <rect x="0" y="0" width="128" height="128" rx="32" fill="url(#icon-bg)"/>
+  
+  <!-- The "Document" Surface -->
+  <!-- Centered, with a slight vertical split treatment -->
+  <g filter="url(#page-shadow)">
+      <rect x="22" y="20" width="84" height="88" rx="4" fill="url(#page-surface)" stroke="#374151" stroke-width="1"/>
+      
+      <!-- Vertical Divider Line -->
+      <line x1="64" y1="20" x2="64" y2="108" stroke="#374151" stroke-width="1"/>
+ 
+      <!-- LEFT SIDE (Before/Delete) -->
+      <!-- Line Numbers (Subtle dots) -->
+      <circle cx="30" cy="34" r="1.5" fill="#4B5563"/>
+      <circle cx="30" cy="46" r="1.5" fill="#4B5563"/>
+      <circle cx="30" cy="58" r="1.5" fill="#4B5563"/>
+      
+      <!-- Content: Standard Lines -->
+      <rect x="36" y="32" width="16" height="4" rx="1" fill="#4B5563"/>
+      <rect x="36" y="44" width="20" height="4" rx="1" fill="#4B5563"/>
+      
+      <!-- Content: Deleted Block -->
+      <rect x="23" y="53" width="40" height="14" fill="url(#diff-red-bg)"/> <!-- Highlight BG -->
+      <rect x="36" y="56" width="22" height="4" rx="1" fill="url(#diff-red-line)"/> <!-- Code -->
+
+
+      <!-- RIGHT SIDE (After/Add) -->
+       <!-- Line Numbers (Subtle dots) -->
+      <circle cx="72" cy="34" r="1.5" fill="#4B5563"/>
+      <circle cx="72" cy="46" r="1.5" fill="#4B5563"/>
+      <circle cx="72" cy="58" r="1.5" fill="#4B5563"/>
+      <circle cx="72" cy="70" r="1.5" fill="#4B5563"/>
+
+      <!-- Content: Standard Lines -->
+      <rect x="78" y="32" width="16" height="4" rx="1" fill="#4B5563"/>
+      <rect x="78" y="44" width="20" height="4" rx="1" fill="#4B5563"/>
+      
+       <!-- Content: Added Block (Slightly different structure to show change) -->
+      <rect x="65" y="53" width="40" height="24" fill="url(#diff-green-bg)"/> <!-- Highlight BG -->
+      <rect x="78" y="56" width="14" height="4" rx="1" fill="url(#diff-green-line)"/> <!-- Code 1 -->
+      <rect x="78" y="66" width="20" height="4" rx="1" fill="url(#diff-green-line)"/> <!-- Code 2 -->
+
+  </g>
+  
+  <!-- Magnifier / Inspection Element (Optional "Tracker" hint) -->
+  <!-- A subtle 'active' corner accent -->
+  <path d="M96 20H102C104.209 20 106 21.7909 106 24V30" stroke="#FBBF24" stroke-width="2" stroke-linecap="round" opacity="0.8"/>
+
+
+</svg>

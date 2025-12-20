@@ -1,32 +1,28 @@
 import * as vscode from 'vscode';
 import { DiffTracker } from './diffTracker';
 
-export class OriginalContentProvider implements vscode.TextDocumentContentProvider {
+export class InlineContentProvider implements vscode.TextDocumentContentProvider {
     private _onDidChange = new vscode.EventEmitter<vscode.Uri>();
     readonly onDidChange = this._onDidChange.event;
 
     constructor(private diffTracker: DiffTracker) {
-        // Listen to changes and notify VS Code to refresh
         this.diffTracker.onDidTrackChanges(() => {
             const changes = this.diffTracker.getTrackedChanges();
             changes.forEach(change => {
-                const uri = vscode.Uri.file(change.filePath).with({ scheme: 'diff-tracker-original' });
+                const uri = vscode.Uri.file(change.filePath).with({ scheme: 'diff-tracker-inline' });
                 this._onDidChange.fire(uri);
             });
         });
     }
 
     provideTextDocumentContent(uri: vscode.Uri): string {
-        // URI format: diff-tracker-original:///<file-path>
         const filePath = uri.fsPath || decodeURIComponent(uri.path);
-
-        // Get original content from snapshots
-        const originalContent = this.diffTracker.getOriginalContent(filePath);
-        if (originalContent) {
-            return originalContent;
+        const content = this.diffTracker.getInlineContent(filePath);
+        if (content !== undefined) {
+            return content;
         }
 
-        return '// Original content not available';
+        return '// Inline diff not available';
     }
 
     public dispose() {

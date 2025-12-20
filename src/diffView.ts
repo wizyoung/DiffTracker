@@ -18,7 +18,7 @@ export class DiffViewProvider {
             this.panel.reveal(columnToShowIn);
         } else {
             this.panel = vscode.window.createWebviewPanel(
-                'diffTrackerView',
+                'diffTrackerChangesPanel',
                 'Diff Tracker - Changes',
                 columnToShowIn || vscode.ViewColumn.One,
                 {
@@ -126,11 +126,134 @@ export class DiffViewProvider {
 
     private generateDiffHtml(fileDiff: FileDiff): string {
         const timeStr = fileDiff.timestamp.toLocaleTimeString();
-        let lineNumber = 1;
+        const inlineView = this.diffTracker.buildInlineViewFromContents(
+            fileDiff.originalContent,
+            fileDiff.currentContent
+        );
+
+        const linesHtml = inlineView
+            ? this.renderInlineView(inlineView.content, inlineView.lineTypes)
+            : this.renderLegacyDiff(fileDiff);
+
+        return `
+            <div class="file-diff">
+                <div class="file-header" onclick="openFile('${fileDiff.filePath}')">
+                    <span class="file-name">📄 ${fileDiff.fileName}</span>
+                    <span class="file-time">${timeStr}</span>
+                </div>
+                <div class="diff-content">
+                    ${linesHtml}
+                </div>
+            </div>
+        `;
+    }
+
+    private renderInlineView(content: string, lineTypes: Array<'added' | 'deleted' | 'unchanged'>): string {
+        const lines = content.split('\n');
+        const total = Math.min(lines.length, lineTypes.length);
+
+        let oldLineNumber = 1;
+        let newLineNumber = 1;
+        let html = '';
+
+        let index = 0;
+        while (index < total) {
+            const type = lineTypes[index];
+            if (type !== 'unchanged') {
+                html += this.renderInlineLine(lines[index], type, oldLineNumber, newLineNumber);
+                if (type === 'deleted') {
+                    oldLineNumber++;
+                } else if (type === 'added') {
+                    newLineNumber++;
+                }
+                index++;
+                continue;
+            }
+
+            let runEnd = index;
+            while (runEnd < total && lineTypes[runEnd] === 'unchanged') {
+                runEnd++;
+            }
+
+            const runLength = runEnd - index;
+            if (runLength > 6) {
+                for (let i = 0; i < 2; i++) {
+                    html += this.renderInlineLine(lines[index + i], 'unchanged', oldLineNumber, newLineNumber);
+                    oldLineNumber++;
+                    newLineNumber++;
+                }
+
+                const skippedCount = runLength - 4;
+                html += `
+                    <div class="diff-line ellipsis">
+                        <span class="line-num old">...</span>
+                        <span class="line-num new">...</span>
+                        <span class="line-marker"> </span>
+                        <span class="line-content">... (${skippedCount} unchanged lines) ...</span>
+                    </div>`;
+                oldLineNumber += skippedCount;
+                newLineNumber += skippedCount;
+
+                for (let i = runLength - 2; i < runLength; i++) {
+                    html += this.renderInlineLine(lines[index + i], 'unchanged', oldLineNumber, newLineNumber);
+                    oldLineNumber++;
+                    newLineNumber++;
+                }
+            } else {
+                for (let i = 0; i < runLength; i++) {
+                    html += this.renderInlineLine(lines[index + i], 'unchanged', oldLineNumber, newLineNumber);
+                    oldLineNumber++;
+                    newLineNumber++;
+                }
+            }
+
+            index = runEnd;
+        }
+
+        return html;
+    }
+
+    private renderInlineLine(
+        line: string,
+        type: 'added' | 'deleted' | 'unchanged',
+        oldLineNumber: number,
+        newLineNumber: number
+    ): string {
+        const safeLine = this.escapeHtml(line);
+        if (type === 'added') {
+            return `
+                <div class="diff-line added">
+                    <span class="line-num old"></span>
+                    <span class="line-num new">${newLineNumber}</span>
+                    <span class="line-marker">+</span>
+                    <span class="line-content">${safeLine}</span>
+                </div>`;
+        }
+
+        if (type === 'deleted') {
+            return `
+                <div class="diff-line removed">
+                    <span class="line-num old">${oldLineNumber}</span>
+                    <span class="line-num new"></span>
+                    <span class="line-marker">-</span>
+                    <span class="line-content">${safeLine}</span>
+                </div>`;
+        }
+
+        return `
+            <div class="diff-line unchanged">
+                <span class="line-num old">${oldLineNumber}</span>
+                <span class="line-num new">${newLineNumber}</span>
+                <span class="line-marker"> </span>
+                <span class="line-content">${safeLine}</span>
+            </div>`;
+    }
+
+    private renderLegacyDiff(fileDiff: FileDiff): string {
         let originalLineNumber = 1;
         let currentLineNumber = 1;
 
-        const linesHtml = fileDiff.changes.map(change => {
+        return fileDiff.changes.map(change => {
             if (change.added) {
                 const lines = change.value.split('\n').filter((l: string) => l !== '');
                 const result = lines.map((line: string) => {
@@ -145,7 +268,9 @@ export class DiffViewProvider {
                     return html;
                 }).join('');
                 return result;
-            } else if (change.removed) {
+            }
+
+            if (change.removed) {
                 const lines = change.value.split('\n').filter((l: string) => l !== '');
                 const result = lines.map((line: string) => {
                     const html = `
@@ -159,80 +284,66 @@ export class DiffViewProvider {
                     return html;
                 }).join('');
                 return result;
-            } else {
-                // Unchanged - only show context (first and last 2 lines)
-                const lines = change.value.split('\n').filter((l: string) => l !== '');
-                if (lines.length > 6) {
-                    // Show first 2 and last 2 lines with ellipsis
-                    const firstLines = lines.slice(0, 2);
-                    const lastLines = lines.slice(-2);
-
-                    let result = firstLines.map((line: string) => {
-                        const html = `
-                            <div class="diff-line unchanged">
-                                <span class="line-num old">${originalLineNumber}</span>
-                                <span class="line-num new">${currentLineNumber}</span>
-                                <span class="line-marker"> </span>
-                                <span class="line-content">${this.escapeHtml(line)}</span>
-                            </div>`;
-                        originalLineNumber++;
-                        currentLineNumber++;
-                        return html;
-                    }).join('');
-
-                    const skippedCount = lines.length - 4;
-                    result += `
-                        <div class="diff-line ellipsis">
-                            <span class="line-num old">...</span>
-                            <span class="line-num new">...</span>
-                            <span class="line-marker"> </span>
-                            <span class="line-content">... (${skippedCount} unchanged lines) ...</span>
-                        </div>`;
-                    originalLineNumber += skippedCount;
-                    currentLineNumber += skippedCount;
-
-                    result += lastLines.map((line: string) => {
-                        const html = `
-                            <div class="diff-line unchanged">
-                                <span class="line-num old">${originalLineNumber}</span>
-                                <span class="line-num new">${currentLineNumber}</span>
-                                <span class="line-marker"> </span>
-                                <span class="line-content">${this.escapeHtml(line)}</span>
-                            </div>`;
-                        originalLineNumber++;
-                        currentLineNumber++;
-                        return html;
-                    }).join('');
-
-                    return result;
-                } else {
-                    return lines.map((line: string) => {
-                        const html = `
-                            <div class="diff-line unchanged">
-                                <span class="line-num old">${originalLineNumber}</span>
-                                <span class="line-num new">${currentLineNumber}</span>
-                                <span class="line-marker"> </span>
-                                <span class="line-content">${this.escapeHtml(line)}</span>
-                            </div>`;
-                        originalLineNumber++;
-                        currentLineNumber++;
-                        return html;
-                    }).join('');
-                }
             }
-        }).join('');
 
-        return `
-            <div class="file-diff">
-                <div class="file-header" onclick="openFile('${fileDiff.filePath}')">
-                    <span class="file-name">📄 ${fileDiff.fileName}</span>
-                    <span class="file-time">${timeStr}</span>
-                </div>
-                <div class="diff-content">
-                    ${linesHtml}
-                </div>
-            </div>
-        `;
+            const lines = change.value.split('\n').filter((l: string) => l !== '');
+            if (lines.length > 6) {
+                const firstLines = lines.slice(0, 2);
+                const lastLines = lines.slice(-2);
+
+                let result = firstLines.map((line: string) => {
+                    const html = `
+                        <div class="diff-line unchanged">
+                            <span class="line-num old">${originalLineNumber}</span>
+                            <span class="line-num new">${currentLineNumber}</span>
+                            <span class="line-marker"> </span>
+                            <span class="line-content">${this.escapeHtml(line)}</span>
+                        </div>`;
+                    originalLineNumber++;
+                    currentLineNumber++;
+                    return html;
+                }).join('');
+
+                const skippedCount = lines.length - 4;
+                result += `
+                    <div class="diff-line ellipsis">
+                        <span class="line-num old">...</span>
+                        <span class="line-num new">...</span>
+                        <span class="line-marker"> </span>
+                        <span class="line-content">... (${skippedCount} unchanged lines) ...</span>
+                    </div>`;
+                originalLineNumber += skippedCount;
+                currentLineNumber += skippedCount;
+
+                result += lastLines.map((line: string) => {
+                    const html = `
+                        <div class="diff-line unchanged">
+                            <span class="line-num old">${originalLineNumber}</span>
+                            <span class="line-num new">${currentLineNumber}</span>
+                            <span class="line-marker"> </span>
+                            <span class="line-content">${this.escapeHtml(line)}</span>
+                        </div>`;
+                    originalLineNumber++;
+                    currentLineNumber++;
+                    return html;
+                }).join('');
+
+                return result;
+            }
+
+            return lines.map((line: string) => {
+                const html = `
+                    <div class="diff-line unchanged">
+                        <span class="line-num old">${originalLineNumber}</span>
+                        <span class="line-num new">${currentLineNumber}</span>
+                        <span class="line-marker"> </span>
+                        <span class="line-content">${this.escapeHtml(line)}</span>
+                    </div>`;
+                originalLineNumber++;
+                currentLineNumber++;
+                return html;
+            }).join('');
+        }).join('');
     }
 
     private escapeHtml(text: string): string {
