@@ -20,6 +20,7 @@
   "activationEvents": [
     "onStartupFinished",
     "onView:diffTracker.changesView",
+    "onView:diffTracker.settingsView",
     "onCommand:diffTracker.toggleRecording",
     "onCommand:diffTracker.startRecording",
     "onCommand:diffTracker.stopRecording"
