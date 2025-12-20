@@ -87,7 +87,80 @@ export class DecorationManager {
         const addedRanges: vscode.Range[] = [];
         const modifiedRanges: vscode.Range[] = [];
         const deletedBadgeRanges: vscode.DecorationOptions[] = [];
-        const deletedCountByLine = new Map<number, number>();
+
+        // Build a mapping from originalLineNumber to currentLineNumber for non-deleted lines
+        const origToCurrentMap = new Map<number, number>();
+        let maxOriginalLine = 0;
+
+        lineChanges.forEach(change => {
+            if (change.type !== 'deleted' && change.originalLineNumber !== undefined) {
+                origToCurrentMap.set(change.originalLineNumber, change.lineNumber);
+                maxOriginalLine = Math.max(maxOriginalLine, change.originalLineNumber);
+            }
+        });
+
+        // Group consecutive deleted lines by their originalLineNumber
+        const deletedGroups: Array<{ originalLines: number[]; }> = [];
+        let currentGroup: number[] = [];
+
+        const deletedChanges = lineChanges.filter(c => c.type === 'deleted');
+        deletedChanges.sort((a, b) => (a.originalLineNumber || 0) - (b.originalLineNumber || 0));
+
+        deletedChanges.forEach(change => {
+            const origLine = change.originalLineNumber || 0;
+            if (currentGroup.length === 0) {
+                currentGroup.push(origLine);
+            } else {
+                const lastLine = currentGroup[currentGroup.length - 1];
+                if (origLine === lastLine + 1) {
+                    // Consecutive
+                    currentGroup.push(origLine);
+                } else {
+                    // Start new group
+                    deletedGroups.push({ originalLines: currentGroup });
+                    currentGroup = [origLine];
+                }
+            }
+        });
+        if (currentGroup.length > 0) {
+            deletedGroups.push({ originalLines: currentGroup });
+        }
+
+        // For each deleted group, find the anchor line in current document
+        deletedGroups.forEach(group => {
+            const firstDeletedOrigLine = group.originalLines[0];
+            const count = group.originalLines.length;
+
+            // Find the closest preceding line that exists in current document
+            let anchorCurrentLine = 0;
+            for (let searchOrig = firstDeletedOrigLine - 1; searchOrig >= 1; searchOrig--) {
+                if (origToCurrentMap.has(searchOrig)) {
+                    anchorCurrentLine = origToCurrentMap.get(searchOrig)!;
+                    break;
+                }
+            }
+
+            // If no preceding line found (deletion at start), anchor to line 1
+            if (anchorCurrentLine === 0 && editor.document.lineCount > 0) {
+                anchorCurrentLine = 1;
+            }
+
+            // Ensure anchor is within bounds
+            if (anchorCurrentLine > 0 && anchorCurrentLine <= editor.document.lineCount) {
+                const lineIndex = anchorCurrentLine - 1;
+                const line = editor.document.lineAt(lineIndex);
+                const label = count === 1 ? '- 1 line deleted' : `- ${count} lines deleted`;
+
+                deletedBadgeRanges.push({
+                    range: new vscode.Range(line.range.end, line.range.end),
+                    renderOptions: {
+                        after: {
+                            contentText: label
+                        }
+                    }
+                });
+            }
+        });
 
         lineChanges.forEach(change => {
             const line = change.lineNumber - 1;
@@ -101,37 +174,10 @@ export class DecorationManager {
                 case 'added':
                     addedRanges.push(range);
                     break;
-                case 'deleted':
-                    {
-                        const anchorLine = Math.max(change.lineNumber - 1, 1);
-                        const safeLine = Math.min(anchorLine, editor.document.lineCount);
-                        const currentCount = deletedCountByLine.get(safeLine) || 0;
-                        deletedCountByLine.set(safeLine, currentCount + 1);
-                    }
-                    break;
                 case 'modified':
                     modifiedRanges.push(range);
                     break;
             }
-        });
-
-        deletedCountByLine.forEach((count, lineNumber) => {
-            if (count <= 0 || editor.document.lineCount === 0) {
-                return;
-            }
-
-            const lineIndex = Math.min(Math.max(lineNumber, 1), editor.document.lineCount) - 1;
-            const line = editor.document.lineAt(lineIndex);
-            const label = count === 1 ? '- 1 line deleted' : `- ${count} lines deleted`;
-
-            deletedBadgeRanges.push({
-                range: new vscode.Range(line.range.end, line.range.end),
-                renderOptions: {
-                    after: {
-                        contentText: label
-                    }
-                }
-            });
         });
 
         editor.setDecorations(this.addedDecorationType, addedRanges);

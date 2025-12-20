@@ -74,6 +74,9 @@ None at this time. Please open an issue if you find a bug.
 - Revert file and revert all
 - Clear diffs
 
+### 0.2.0
+- change from LCS-based diff to Patience Diff algorithm for more intuitive diff display
+
 ## License
 
 MIT

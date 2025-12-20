@@ -2,7 +2,7 @@
   "name": "diff-tracker",
   "displayName": "Diff Tracker",
   "description": "Visual file diff tracking - record and display changes in real-time",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "Wizyoung",
   "author": "Wizyoung",
   "icon": "resources/marketplace-icon.png",
@@ -164,6 +164,6 @@
     "typescript": "^5.2.0"
   },
   "dependencies": {
-    "diff": "^5.1.0"
+    "diff": "^5.2.0"
   }
 }
