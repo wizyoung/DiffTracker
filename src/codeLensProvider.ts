@@ -38,6 +38,12 @@ export class DiffCodeLensProvider implements vscode.CodeLensProvider {
             return [];
         }
 
+        // Check if CodeLens is enabled in settings
+        const config = vscode.workspace.getConfiguration('diffTracker');
+        if (!config.get<boolean>('showCodeLens', true)) {
+            return [];
+        }
+
         if (document.uri.scheme !== 'file') {
             return [];
         }
@@ -51,6 +57,30 @@ export class DiffCodeLensProvider implements vscode.CodeLensProvider {
 
         const codeLenses: vscode.CodeLens[] = [];
 
+        // File-level actions at the very top (line 0)
+        const topRange = new vscode.Range(0, 0, 0, 0);
+
+        codeLenses.push(new vscode.CodeLens(topRange, {
+            title: '↩ Revert All',
+            command: 'diffTracker.revertAllBlocksInFile',
+            arguments: [filePath],
+            tooltip: 'Revert all changes in this file'
+        }));
+
+        codeLenses.push(new vscode.CodeLens(topRange, {
+            title: '✓ Keep All',
+            command: 'diffTracker.keepAllBlocksInFile',
+            arguments: [filePath],
+            tooltip: 'Accept all changes in this file'
+        }));
+
+        codeLenses.push(new vscode.CodeLens(topRange, {
+            title: `${blocks.length} block${blocks.length > 1 ? 's' : ''}`,
+            command: '',
+            arguments: []
+        }));
+
+        // Block-level actions
         blocks.forEach((block, index) => {
             // Position CodeLens at the start of the block
             const line = Math.max(0, block.startLine - 1);

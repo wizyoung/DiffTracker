@@ -8,9 +8,9 @@ export class DecorationManager {
     private deletedBadgeDecorationType: vscode.TextEditorDecorationType;
 
     constructor(private diffTracker: DiffTracker) {
-        // Green background for added lines
+        // Green background for added lines (lighter shade)
         this.addedDecorationType = vscode.window.createTextEditorDecorationType({
-            backgroundColor: 'rgba(63, 185, 80, 0.25)',
+            backgroundColor: 'rgba(63, 185, 80, 0.12)',
             isWholeLine: true,
             overviewRulerColor: 'rgba(63, 185, 80, 0.8)',
             overviewRulerLane: vscode.OverviewRulerLane.Left,
@@ -18,9 +18,9 @@ export class DecorationManager {
             gutterIconSize: 'contain'
         });
 
-        // Red background for deleted lines
+        // Red background for deleted lines (lighter shade)
         this.deletedDecorationType = vscode.window.createTextEditorDecorationType({
-            backgroundColor: 'rgba(248, 81, 73, 0.25)',
+            backgroundColor: 'rgba(248, 81, 73, 0.12)',
             isWholeLine: true,
             overviewRulerColor: 'rgba(248, 81, 73, 0.8)',
             overviewRulerLane: vscode.OverviewRulerLane.Left,
@@ -83,6 +83,12 @@ export class DecorationManager {
             this.clearDecorations(editor);
             return;
         }
+
+        // Read settings
+        const config = vscode.workspace.getConfiguration('diffTracker');
+        const showDeletedBadge = config.get<boolean>('showDeletedLinesBadge', true);
+        const highlightAdded = config.get<boolean>('highlightAddedLines', true);
+        const highlightModified = config.get<boolean>('highlightModifiedLines', true);
 
         const addedRanges: vscode.Range[] = [];
         const modifiedRanges: vscode.Range[] = [];
@@ -172,10 +178,14 @@ export class DecorationManager {
 
             switch (change.type) {
                 case 'added':
-                    addedRanges.push(range);
+                    if (highlightAdded) {
+                        addedRanges.push(range);
+                    }
                     break;
                 case 'modified':
-                    modifiedRanges.push(range);
+                    if (highlightModified) {
+                        modifiedRanges.push(range);
+                    }
                     break;
             }
         });
@@ -183,7 +193,7 @@ export class DecorationManager {
         editor.setDecorations(this.addedDecorationType, addedRanges);
         editor.setDecorations(this.modifiedDecorationType, modifiedRanges);
         editor.setDecorations(this.deletedDecorationType, []);
-        editor.setDecorations(this.deletedBadgeDecorationType, deletedBadgeRanges);
+        editor.setDecorations(this.deletedBadgeDecorationType, showDeletedBadge ? deletedBadgeRanges : []);
     }
 
     public clearDecorations(editor: vscode.TextEditor) {

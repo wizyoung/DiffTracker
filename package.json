@@ -2,7 +2,7 @@
   "name": "diff-tracker",
   "displayName": "Diff Tracker",
   "description": "Visual file diff tracking - record and display changes in real-time",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "Wizyoung",
   "author": "Wizyoung",
   "icon": "resources/marketplace-icon.png",
@@ -39,8 +39,37 @@
         {
           "id": "diffTracker.changesView",
           "name": "Change Recording"
+        },
+        {
+          "id": "diffTracker.settingsView",
+          "name": "Settings"
         }
       ]
+    },
+    "configuration": {
+      "title": "Diff Tracker",
+      "properties": {
+        "diffTracker.showDeletedLinesBadge": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a badge indicating deleted lines"
+        },
+        "diffTracker.showCodeLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show CodeLens actions (Revert/Keep) above change blocks"
+        },
+        "diffTracker.highlightAddedLines": {
+          "type": "boolean",
+          "default": true,
+          "description": "Highlight added lines with green background"
+        },
+        "diffTracker.highlightModifiedLines": {
+          "type": "boolean",
+          "default": true,
+          "description": "Highlight modified lines with blue background"
+        }
+      }
     },
     "commands": [
       {
@@ -130,6 +159,16 @@
         "title": "Open Original File",
         "category": "Diff Tracker",
         "icon": "$(go-to-file)"
+      },
+      {
+        "command": "diffTracker.revertAllBlocksInFile",
+        "title": "Revert All Changes in File",
+        "category": "Diff Tracker"
+      },
+      {
+        "command": "diffTracker.keepAllBlocksInFile",
+        "title": "Keep All Changes in File",
+        "category": "Diff Tracker"
       }
     ],
     "menus": {

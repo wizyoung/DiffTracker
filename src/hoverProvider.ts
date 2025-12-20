@@ -39,20 +39,20 @@ export class DiffHoverProvider implements vscode.HoverProvider {
         let hoverText = '';
 
         const deletedTexts = deletedChangesForAnchor
-            .filter(c => c.type === 'deleted' && c.oldText)
-            .map(c => c.oldText as string);
+            .filter(c => c.type === 'deleted' && c.oldText !== undefined)
+            .map(c => c.oldText === '' ? '(empty line)' : c.oldText as string);
 
         const addedTexts = changesForLine
-            .filter(c => c.type === 'added' && c.newText)
-            .map(c => c.newText as string);
+            .filter(c => c.type === 'added' && c.newText !== undefined)
+            .map(c => c.newText === '' ? '(empty line)' : c.newText as string);
 
         const modifiedOld = changesForLine
-            .filter(c => c.type === 'modified' && c.oldText)
-            .map(c => c.oldText as string);
+            .filter(c => c.type === 'modified' && c.oldText !== undefined)
+            .map(c => c.oldText === '' ? '(empty line)' : c.oldText as string);
 
         const modifiedNew = changesForLine
-            .filter(c => c.type === 'modified' && c.newText)
-            .map(c => c.newText as string);
+            .filter(c => c.type === 'modified' && c.newText !== undefined)
+            .map(c => c.newText === '' ? '(empty line)' : c.newText as string);
 
         if (deletedTexts.length > 0) {
             hoverText = `**Deleted (${deletedTexts.length} line(s)):**\n\`\`\`\n${deletedTexts.join('\n')}\n\`\`\``;

@@ -264,7 +264,7 @@ export class DiffTracker {
 
     /**
      * Keep a specific change block (accept the changes)
-     * This updates the snapshot to include the current changes
+     * This surgically updates the snapshot to include only this block's changes
      */
     public keepBlock(filePath: string, blockIndex: number): boolean {
         const blocks = this.getChangeBlocks(filePath);
@@ -274,32 +274,105 @@ export class DiffTracker {
 
         const block = blocks[blockIndex];
         const originalContent = this.fileSnapshots.get(filePath);
-        const trackedChange = this.trackedChanges.get(filePath);
+        const doc = vscode.workspace.textDocuments.find(d => d.uri.fsPath === filePath);
 
-        if (originalContent === undefined || !trackedChange) {
+        if (originalContent === undefined || !doc) {
             return false;
         }
 
-        // Update the snapshot to include this block's changes
-        // This effectively "accepts" the changes for this block
-        const currentContent = trackedChange.currentContent;
         const originalLines = originalContent.split('\n');
-        const currentLines = currentContent.split('\n');
+        const currentLines = doc.getText().split('\n');
 
-        // For simplicity, update the entire snapshot to current content
-        // A more sophisticated approach would surgically update only the block
-        // But for now, keeping a block means we update the snapshot
-        // to the current document state for those lines
+        // Surgically update the snapshot based on block type
+        if (block.type === 'added') {
+            // For added lines: insert the new lines into the snapshot
+            // The added lines in current doc at block.startLine-1 to block.endLine-1
+            // should be inserted into snapshot
+            const insertPosition = this.findInsertPosition(block, blocks, originalLines.length);
+            const addedLines = currentLines.slice(block.startLine - 1, block.endLine);
+            originalLines.splice(insertPosition, 0, ...addedLines);
+        } else if (block.type === 'modified') {
+            // For modified lines: replace original lines with current lines
+            block.changes.forEach(change => {
+                if (change.originalLineNumber !== undefined && change.originalLineNumber >= 1) {
+                    const origIdx = change.originalLineNumber - 1;
+                    if (origIdx < originalLines.length) {
+                        // Get the current line content
+                        const currentIdx = change.lineNumber - 1;
+                        if (currentIdx < currentLines.length) {
+                            originalLines[origIdx] = currentLines[currentIdx];
+                        }
+                    }
+                }
+            });
+        } else if (block.type === 'deleted') {
+            // For deleted lines: remove them from snapshot (they're already gone from current)
+            // Collect original line numbers to remove (in reverse order to maintain indices)
+            const origLinesToRemove = block.changes
+                .map(c => c.originalLineNumber)
+                .filter((n): n is number => n !== undefined)
+                .sort((a, b) => b - a); // Sort descending
 
-        // Get the document's current content and update snapshot
-        const doc = vscode.workspace.textDocuments.find(d => d.uri.fsPath === filePath);
-        if (doc) {
-            this.fileSnapshots.set(filePath, doc.getText());
-            // Recalculate changes
-            this.calculateLineChanges(filePath);
-            this._onDidTrackChanges.fire();
+            origLinesToRemove.forEach(origLineNum => {
+                const idx = origLineNum - 1;
+                if (idx >= 0 && idx < originalLines.length) {
+                    originalLines.splice(idx, 1);
+                }
+            });
         }
 
+        // Update the snapshot with the modified original
+        this.fileSnapshots.set(filePath, originalLines.join('\n'));
+
+        // Recalculate changes
+        this.calculateLineChanges(filePath);
+        this._onDidTrackChanges.fire();
+
+        return true;
+    }
+
+    /**
+     * Find where to insert added lines in the original snapshot
+     */
+    private findInsertPosition(
+        addedBlock: { startLine: number; changes: LineChange[] },
+        allBlocks: Array<{ startLine: number; type: string; changes: LineChange[] }>,
+        originalLength: number
+    ): number {
+        // Look at the line before the added block in current doc
+        // and find its corresponding original line number
+        const lineChanges = addedBlock.changes;
+        if (lineChanges.length === 0) return originalLength;
+
+        // Find the closest preceding non-added line that has an originalLineNumber
+        // For now, use a simple heuristic: insert at the originalLineNumber of the first change
+        // or at the end if no reference
+        const firstChange = lineChanges[0];
+        if (firstChange.originalLineNumber !== undefined) {
+            return firstChange.originalLineNumber - 1;
+        }
+        return originalLength;
+    }
+
+    /**
+     * Keep all changes in a file (accept all changes)
+     * Updates the snapshot to match current document content
+     */
+    public keepAllChangesInFile(filePath: string): boolean {
+        const doc = vscode.workspace.textDocuments.find(d => d.uri.fsPath === filePath);
+        if (!doc) {
+            return false;
+        }
+
+        // Update snapshot to current content
+        this.fileSnapshots.set(filePath, doc.getText());
+
+        // Clear tracked changes for this file
+        this.trackedChanges.delete(filePath);
+        this.lineChanges.delete(filePath);
+        this.inlineViews.delete(filePath);
+
+        this._onDidTrackChanges.fire();
         return true;
     }
 

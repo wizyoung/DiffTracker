@@ -7,6 +7,7 @@ import { StatusBarManager } from './statusBarManager';
 import { OriginalContentProvider } from './originalContentProvider';
 import { InlineContentProvider } from './inlineContentProvider';
 import { DiffCodeLensProvider } from './codeLensProvider';
+import { SettingsTreeDataProvider } from './settingsTreeView';
 
 let diffTracker: DiffTracker;
 let decorationManager: DecorationManager;
@@ -14,6 +15,7 @@ let statusBarManager: StatusBarManager;
 let originalContentProvider: OriginalContentProvider;
 let inlineContentProvider: InlineContentProvider;
 let codeLensProvider: DiffCodeLensProvider;
+let settingsTreeDataProvider: SettingsTreeDataProvider;
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('Diff Tracker extension is now active');
@@ -25,11 +27,29 @@ export function activate(context: vscode.ExtensionContext) {
     originalContentProvider = new OriginalContentProvider(diffTracker);
     inlineContentProvider = new InlineContentProvider(diffTracker);
     codeLensProvider = new DiffCodeLensProvider(diffTracker);
+    settingsTreeDataProvider = new SettingsTreeDataProvider();
 
     // Register tree view provider for activity bar
     const treeDataProvider = new DiffTreeDataProvider(diffTracker);
     context.subscriptions.push(
         vscode.window.registerTreeDataProvider('diffTracker.changesView', treeDataProvider)
+    );
+
+    // Register settings tree view
+    context.subscriptions.push(
+        vscode.window.registerTreeDataProvider('diffTracker.settingsView', settingsTreeDataProvider)
+    );
+
+    // Register toggle setting command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('diffTracker.toggleSetting', async (settingKey: string) => {
+            await settingsTreeDataProvider.toggleSetting(settingKey);
+            // Refresh decorations after setting change
+            vscode.window.visibleTextEditors.forEach(editor => {
+                decorationManager.updateDecorations(editor);
+            });
+            codeLensProvider.refresh();
+        })
     );
 
     // Register hover provider to show diff details
@@ -278,6 +298,26 @@ export function activate(context: vscode.ExtensionContext) {
                 editor.selection = new vscode.Selection(position, position);
                 editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
             }
+        })
+    );
+
+    // Revert all blocks in a file
+    context.subscriptions.push(
+        vscode.commands.registerCommand('diffTracker.revertAllBlocksInFile', async (filePath: string) => {
+            const success = await diffTracker.revertFile(filePath);
+            if (success) {
+                codeLensProvider.refresh();
+                treeDataProvider.refresh();
+            }
+        })
+    );
+
+    // Keep all blocks in a file (accept all changes)
+    context.subscriptions.push(
+        vscode.commands.registerCommand('diffTracker.keepAllBlocksInFile', (filePath: string) => {
+            diffTracker.keepAllChangesInFile(filePath);
+            codeLensProvider.refresh();
+            treeDataProvider.refresh();
         })
     );
 
