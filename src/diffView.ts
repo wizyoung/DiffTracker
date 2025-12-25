@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as Diff from 'diff';
 import { DiffTracker, FileDiff } from './diffTracker';
 
 export class DiffViewProvider {
@@ -159,13 +160,53 @@ export class DiffViewProvider {
         let index = 0;
         while (index < total) {
             const type = lineTypes[index];
-            if (type !== 'unchanged') {
-                html += this.renderInlineLine(lines[index], type, oldLineNumber, newLineNumber);
-                if (type === 'deleted') {
+
+            // Check for consecutive deleted lines followed by consecutive added lines
+            if (type === 'deleted') {
+                // Collect all consecutive deleted lines
+                const deletedStart = index;
+                while (index < total && lineTypes[index] === 'deleted') {
+                    index++;
+                }
+                const deletedEnd = index;
+                const deletedCount = deletedEnd - deletedStart;
+
+                // Collect all consecutive added lines that follow
+                const addedStart = index;
+                while (index < total && lineTypes[index] === 'added') {
+                    index++;
+                }
+                const addedEnd = index;
+                const addedCount = addedEnd - addedStart;
+
+                // Pair deleted and added lines by position for word-level diff
+                const pairCount = Math.min(deletedCount, addedCount);
+                for (let i = 0; i < pairCount; i++) {
+                    const oldLine = lines[deletedStart + i];
+                    const newLine = lines[addedStart + i];
+                    html += this.renderModifiedLinePair(oldLine, newLine, oldLineNumber, newLineNumber);
                     oldLineNumber++;
-                } else if (type === 'added') {
                     newLineNumber++;
                 }
+
+                // Render remaining unpaired deleted lines
+                for (let i = pairCount; i < deletedCount; i++) {
+                    html += this.renderInlineLine(lines[deletedStart + i], 'deleted', oldLineNumber, newLineNumber);
+                    oldLineNumber++;
+                }
+
+                // Render remaining unpaired added lines
+                for (let i = pairCount; i < addedCount; i++) {
+                    html += this.renderInlineLine(lines[addedStart + i], 'added', oldLineNumber, newLineNumber);
+                    newLineNumber++;
+                }
+
+                continue;
+            }
+
+            if (type === 'added') {
+                html += this.renderInlineLine(lines[index], type, oldLineNumber, newLineNumber);
+                newLineNumber++;
                 index++;
                 continue;
             }
@@ -211,6 +252,47 @@ export class DiffViewProvider {
         }
 
         return html;
+    }
+
+    /**
+     * Render a modified line pair (deleted + added) with word-level diff highlighting
+     */
+    private renderModifiedLinePair(
+        oldLine: string,
+        newLine: string,
+        oldLineNumber: number,
+        newLineNumber: number
+    ): string {
+        const wordDiff = Diff.diffWordsWithSpace(oldLine, newLine);
+
+        let oldHtml = '';
+        let newHtml = '';
+
+        for (const part of wordDiff) {
+            const escaped = this.escapeHtml(part.value);
+            if (part.removed) {
+                oldHtml += `<span class="word-removed">${escaped}</span>`;
+            } else if (part.added) {
+                newHtml += `<span class="word-added">${escaped}</span>`;
+            } else {
+                oldHtml += escaped;
+                newHtml += escaped;
+            }
+        }
+
+        return `
+            <div class="diff-line removed">
+                <span class="line-num old">${oldLineNumber}</span>
+                <span class="line-num new"></span>
+                <span class="line-marker">-</span>
+                <span class="line-content">${oldHtml}</span>
+            </div>
+            <div class="diff-line added">
+                <span class="line-num old"></span>
+                <span class="line-num new">${newLineNumber}</span>
+                <span class="line-marker">+</span>
+                <span class="line-content">${newHtml}</span>
+            </div>`;
     }
 
     private renderInlineLine(
@@ -513,6 +595,19 @@ export class DiffViewProvider {
                 background-color: var(--vscode-editorGutter-background);
                 opacity: 0.5;
                 font-style: italic;
+            }
+
+            /* Word-level diff highlighting */
+            .word-added {
+                background-color: rgba(63, 185, 80, 0.4);
+                border-radius: 2px;
+                padding: 1px 0;
+            }
+
+            .word-removed {
+                background-color: rgba(248, 81, 73, 0.4);
+                border-radius: 2px;
+                padding: 1px 0;
             }
 
             /* Scrollbar styling */

@@ -35,7 +35,8 @@ export class SettingsTreeDataProvider implements vscode.TreeDataProvider<Setting
         { key: 'showDeletedLinesBadge', label: 'Show Deleted Lines Badge' },
         { key: 'showCodeLens', label: 'Show CodeLens Actions' },
         { key: 'highlightAddedLines', label: 'Highlight Added Lines' },
-        { key: 'highlightModifiedLines', label: 'Highlight Modified Lines' }
+        { key: 'highlightModifiedLines', label: 'Highlight Modified Lines' },
+        { key: 'highlightWordChanges', label: 'Highlight Word Changes' }
     ];
 
     constructor() {
